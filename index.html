@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fatura Takip Uygulaması</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            margin-left: -125px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            left: 50%;
+            bottom: 30px;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.5s linear;
+        }
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
+        #custom-recurring-options {
+            transition: all 0.3s ease-in-out;
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+        }
+        #custom-recurring-options.visible {
+            max-height: 200px; /* Adjust as needed */
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-4">
+
+    <div class="w-full max-w-md mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-cyan-400">Fatura Takip</h1>
+            <p class="text-gray-400 mt-1">Faturalarınızı kolayca yönetin ve ödemeleri kaçırmayın.</p>
+        </header>
+
+        <!-- Bildirim İzin Butonu -->
+        <div id="notification-permission-section" class="text-center mb-6">
+            <button id="enable-notifications-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">
+                Bildirimlere İzin Ver
+            </button>
+            <p id="notification-status" class="text-sm text-gray-500 mt-2"></p>
+        </div>
+
+        <!-- Fatura Ekleme Formu -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-xl font-semibold mb-4">Yeni Fatura Ekle</h2>
+            <form id="bill-form" class="space-y-4">
+                <div>
+                    <label for="bill-name" class="block text-sm font-medium text-gray-300">Fatura Adı (örn: Elektrik)</label>
+                    <input type="text" id="bill-name" placeholder="Fatura Adı" required class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                </div>
+                <div>
+                    <label for="bill-amount" class="block text-sm font-medium text-gray-300">Tutar (₺)</label>
+                    <input type="number" id="bill-amount" placeholder="Örn: 150" required class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500" min="0" step="0.01">
+                </div>
+                <div>
+                    <label for="due-date" class="block text-sm font-medium text-gray-300">Son Ödeme Tarihi</label>
+                    <input type="date" id="due-date" required class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                </div>
+                <div>
+                    <label for="bill-type" class="block text-sm font-medium text-gray-300">Fatura Tipi</label>
+                    <select id="bill-type" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                        <option value="one-time">Tek Seferlik</option>
+                        <option value="regular">Düzenli (Süresiz Aylık)</option>
+                        <option value="custom">Özel Tekrarlı</option>
+                    </select>
+                </div>
+
+                <!-- YENİ: Gizli Özel Tekrarlama Seçenekleri -->
+                <div id="custom-recurring-options">
+                     <label class="block text-sm font-medium text-gray-300">Tekrarlama Sıklığı</label>
+                    <div class="flex items-center space-x-2 mt-1">
+                       <span class="text-gray-400">Her</span>
+                        <input type="number" id="recurring-value" value="1" min="1" class="w-16 bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                        <select id="recurring-unit" class="w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                            <option value="day">Gün</option>
+                            <option value="week">Hafta</option>
+                            <option value="month" selected>Ay</option>
+                            <option value="year">Yıl</option>
+                        </select>
+                         <span class="text-gray-400">'de bir</span>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2.5 px-4 rounded-lg transition-colors duration-300">
+                    Faturayı Kaydet
+                </button>
+            </form>
+        </div>
+
+        <!-- Fatura Listesi -->
+        <div>
+            <h2 class="text-xl font-semibold mb-4 text-center">Yaklaşan Faturalar</h2>
+            <div id="bill-list" class="space-y-3">
+                <!-- Faturalar buraya eklenecek -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Bildirimi -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Elementleri seçme
+            const billForm = document.getElementById('bill-form');
+            const billList = document.getElementById('bill-list');
+            const billTypeInput = document.getElementById('bill-type');
+            const customRecurringOptions = document.getElementById('custom-recurring-options');
+            const toast = document.getElementById('toast');
+            
+            let bills = JSON.parse(localStorage.getItem('bills')) || [];
+
+            // --- YARDIMCI FONKSİYONLAR ---
+            const getNextDueDate = (currentDueDate, recurringPeriod) => {
+                let newDueDate = new Date(currentDueDate);
+                const { value, unit } = recurringPeriod;
+                
+                switch (unit) {
+                    case 'day': newDueDate.setDate(newDueDate.getDate() + value); break;
+                    case 'week': newDueDate.setDate(newDueDate.getDate() + value * 7); break;
+                    case 'month': newDueDate.setMonth(newDueDate.getMonth() + value); break;
+                    case 'year': newDueDate.setFullYear(newDueDate.getFullYear() + value); break;
+                    default: newDueDate.setMonth(newDueDate.getMonth() + 1);
+                }
+                return newDueDate;
+            };
+
+            const getRecurringText = (bill) => {
+                if (bill.type !== 'recurring') return '';
+                if (!bill.recurringPeriod) return 'HER AY';
+                
+                const { value, unit } = bill.recurringPeriod;
+                if (value === 1 && unit === 'month') return 'DÜZENLİ AYLIK';
+
+                const unitText = {
+                    'day': 'GÜNDE BİR',
+                    'week': 'HAFTADA BİR',
+                    'month': 'AYDA BİR',
+                    'year': 'YILDA BİR'
+                }[unit];
+                
+                return `HER ${value > 1 ? value : ''} ${unitText}`.trim();
+            };
+
+            // --- ÇEKİRDEK MANTIK ---
+            const autoUpdateRecurringBills = () => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                let billsUpdated = false;
+
+                bills.forEach(bill => {
+                    if (bill.type === 'recurring') {
+                        let dueDate = new Date(bill.dueDate);
+                        while (dueDate < today) {
+                            const period = bill.recurringPeriod || { value: 1, unit: 'month' };
+                            dueDate = getNextDueDate(dueDate, period);
+                            billsUpdated = true;
+                            bill.notified = false;
+                        }
+                        bill.dueDate = dueDate.toISOString().split('T')[0];
+                    }
+                });
+                
+                if (billsUpdated) {
+                    localStorage.setItem('bills', JSON.stringify(bills));
+                    return true;
+                }
+                return false;
+            };
+
+            // --- ARAYÜZ MANTIĞI ---
+            const toggleCustomRecurringOptions = () => {
+                if (billTypeInput.value === 'custom') {
+                    customRecurringOptions.classList.add('visible');
+                } else {
+                    customRecurringOptions.classList.remove('visible');
+                }
+            };
+
+            billTypeInput.addEventListener('change', toggleCustomRecurringOptions);
+
+            const renderBills = () => {
+                billList.innerHTML = '';
+                if (bills.length === 0) {
+                    billList.innerHTML = `<p class="text-gray-500 text-center">Henüz fatura eklenmedi.</p>`;
+                    return;
+                }
+                
+                const sortedBills = [...bills].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+                sortedBills.forEach(bill => {
+                    const billElement = document.createElement('div');
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    const dueDate = new Date(bill.dueDate);
+                    
+                    const timeDiff = dueDate.getTime() - today.getTime();
+                    const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+                    let borderColor = 'border-gray-700';
+                    let dateText = `Son gün: ${dayDiff} gün sonra`;
+                    if (dayDiff < 0) { borderColor = 'border-red-500'; dateText = `Tarihi geçti!`;}
+                    else if (dayDiff <= 3) { borderColor = 'border-yellow-500'; }
+                    if (dayDiff === 0){ dateText = 'Son gün bugün!'; }
+                    if (dayDiff === 1){ dateText = 'Son gün yarın!'; }
+
+                    const typeBadge = bill.type === 'recurring' 
+                        ? `<span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-green-200 bg-green-600">${getRecurringText(bill)}</span>`
+                        : `<span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-200 bg-blue-600">TEK SEFERLİK</span>`;
+
+                    const actionButton = bill.type === 'recurring'
+                        ? `<button data-id="${bill.id}" class="paid-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg transition-colors duration-300">Ödendi</button>`
+                        : `<button data-id="${bill.id}" class="delete-btn bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-full transition-colors duration-300">Sil</button>`;
+
+                    billElement.className = `bg-gray-800 p-4 rounded-lg flex items-center justify-between border-l-4 ${borderColor}`;
+                    billElement.innerHTML = `
+                        <div class="flex-grow">
+                             <div class="flex items-center gap-3 mb-1 flex-wrap">
+                                <p class="font-bold text-lg">${bill.name}</p>
+                                ${typeBadge}
+                            </div>
+                            <p class="text-cyan-400 text-xl">${bill.amount} ₺</p>
+                            <p class="text-sm text-gray-400 mt-1">${new Date(bill.dueDate).toLocaleDateString('tr-TR')} - ${dateText}</p>
+                        </div>
+                        ${actionButton}
+                    `;
+                    billList.appendChild(billElement);
+                });
+            };
+
+            billForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('bill-name').value.trim();
+                const amount = parseFloat(document.getElementById('bill-amount').value);
+                const dueDate = document.getElementById('due-date').value;
+                const typeChoice = document.getElementById('bill-type').value;
+
+                if (name && !isNaN(amount) && dueDate) {
+                    const newBill = { id: Date.now().toString(), name, amount, dueDate, notified: false };
+                    
+                    if(typeChoice === 'regular' || typeChoice === 'custom') {
+                        newBill.type = 'recurring'; // Veri modelini basit tutmak için
+                        if (typeChoice === 'regular') {
+                           newBill.recurringPeriod = { value: 1, unit: 'month' };
+                        } else { // typeChoice === 'custom'
+                           newBill.recurringPeriod = {
+                                value: parseInt(document.getElementById('recurring-value').value) || 1,
+                                unit: document.getElementById('recurring-unit').value || 'month'
+                           };
+                        }
+                    } else { // typeChoice === 'one-time'
+                        newBill.type = 'one-time';
+                    }
+
+                    bills.push(newBill);
+                    saveAndRender();
+                    billForm.reset();
+                    toggleCustomRecurringOptions();
+                    showToast("Fatura başarıyla eklendi!");
+                }
+            });
+
+            billList.addEventListener('click', (e) => {
+                const id = e.target.getAttribute('data-id');
+                if (!id) return;
+
+                if (e.target.classList.contains('delete-btn')) {
+                    bills = bills.filter(bill => bill.id !== id);
+                    showToast("Fatura silindi.");
+                } else if (e.target.classList.contains('paid-btn')) {
+                    const billIndex = bills.findIndex(bill => bill.id === id);
+                    if (billIndex > -1) {
+                        const bill = bills[billIndex];
+                        const period = bill.recurringPeriod || { value: 1, unit: 'month' };
+                        const newDueDate = getNextDueDate(bill.dueDate, period);
+                        
+                        bill.dueDate = newDueDate.toISOString().split('T')[0];
+                        bill.notified = false;
+                        showToast(`${bill.name} faturası bir sonraki periyoda güncellendi.`);
+                    }
+                }
+                saveAndRender();
+            });
+
+            const saveAndRender = () => {
+                localStorage.setItem('bills', JSON.stringify(bills));
+                renderBills();
+            };
+
+            const showToast = (message) => {
+                toast.textContent = message;
+                toast.classList.add('show');
+                setTimeout(() => { toast.classList.remove('show'); }, 3000);
+            };
+
+            // --- BİLDİRİM VE ZAMANLAYICI KISMI ---
+            const enableNotificationsBtn = document.getElementById('enable-notifications-btn');
+            const notificationStatus = document.getElementById('notification-status');
+
+            const requestNotificationPermission = () => {
+                if (!("Notification" in window)) { showToast("Bu tarayıcı bildirimleri desteklemiyor."); return; }
+                Notification.requestPermission().then(permission => updateNotificationStatus(permission));
+            };
+            const updateNotificationStatus = (permission) => {
+                 if (permission === "granted") { notificationStatus.textContent = "Bildirimlere izin verildi."; enableNotificationsBtn.style.display = 'none'; }
+                 else if (permission === "denied") { notificationStatus.textContent = "Bildirimler engellendi. Ayarlardan değiştirmeniz gerekir."; enableNotificationsBtn.disabled = true; }
+                 else { notificationStatus.textContent = "Ödeme hatırlatmaları için bildirimlere izin verin.";}
+            };
+            enableNotificationsBtn.addEventListener('click', requestNotificationPermission);
+            updateNotificationStatus(Notification.permission);
+
+            const checkBillsForNotification = () => {
+                if (Notification.permission !== "granted") return;
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                bills.forEach(bill => {
+                    const dueDate = new Date(bill.dueDate);
+                    const dayDiff = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+                    if ((dayDiff === 0 || dayDiff === 1) && !bill.notified) {
+                        const msg = dayDiff === 0 ? `Bugün son gün!` : `Yarın son gün!`;
+                        new Notification(`${bill.name} Faturası`, { body: `${bill.amount}₺ tutarındaki faturanızın son ödeme tarihi yaklaştı. ${msg}`, icon: 'https://placehold.co/192x192/06b6d4/ffffff?text=!' });
+                        bill.notified = true;
+                        localStorage.setItem('bills', JSON.stringify(bills));
+                    }
+                });
+            };
+            
+            const runHourlyChecks = () => {
+                if (autoUpdateRecurringBills()) { renderBills(); }
+                checkBillsForNotification();
+            };
+            
+            // --- BAŞLANGIÇ ---
+            autoUpdateRecurringBills();
+            renderBills();
+            checkBillsForNotification();
+            setInterval(runHourlyChecks, 1000 * 60 * 60);
+        });
+    </script>
+</body>
+</html>
+
